@@ -37,7 +37,7 @@
 
 	Class oDBO extends \obray\oObject {
 
-		public $dbh;
+		protected $oDBOConnection;
 		public $enable_system_columns = TRUE;
 
 		public function __construct(){
@@ -73,7 +73,7 @@
 		}
 
 		public function startTransaction(){
-			$this->dbh->beginTransaction();
+			$this->oDBOConnection->connect()->beginTransaction();
 			$this->is_transaction = TRUE;
 		}
 
@@ -81,12 +81,12 @@
 			if(!$this->is_transaction){
 				return;  //This likely means that the transaction was rolled back and should therefore not be committed. (that or there was never a transaction to begin with).
 				}
-			$this->dbh->commit();
+			$this->oDBOConnection->connect()->commit();
 			$this->is_transaction = FALSE;
 		}
 
 		public function rollbackTransaction(){
-			$this->dbh->rollBack();
+			$this->oDBOConnection->connect()->rollBack();
 			$this->is_transaction = FALSE;
 		}
 
@@ -112,70 +112,93 @@
 			}
 		}
 
-		public function setDatabaseConnection($dbh){
-
-				$this->dbh = $dbh;
-				if( !isSet($this->table) || $this->table == '' ){ return; }
-				if(__OBRAY_DEBUG_MODE__){ $this->scriptTable(); $this->alterTable(); }
+		public function setDatabaseConnection( $oDBOConnection ){
+			
+			$this->oDBOConnection = $oDBOConnection;	
+			if( !isSet($this->table) || $this->table == '' ){ return; }
+			if( $this->debug_mode ){ $this->scriptTable(); $this->alterTable(); }
 
 		}
 
 		/*************************************************************************************************************
 
-		SCRIPTTABLE
+			SCRIPT TABLE
 
 		*************************************************************************************************************/
 
 		public function scriptTable($params=array()){
 
-				$sql = 'CREATE DATABASE IF NOT EXISTS '.__OBRAY_DATABASE_NAME__.';'; $statement = $this->dbh->prepare($sql); $statement->execute();
+			// script database if it does't exist
+			$sql = 'CREATE DATABASE IF NOT EXISTS '.$this->oDBOConnection->getDBName().';'; 
+			$statement = $this->oDBOConnection->connect()->prepare($sql); 
+			$statement->execute();
 
-				if( empty($this->dbh) ){ return $this; }
+			$sql = '';
+			$data_types = unserialize(__OBRAY_DATATYPES__);
 
-				$sql = '';
-				$data_types = unserialize(__OBRAY_DATATYPES__);
+			forEach($this->table_definition as $name => $def){
+				if( isSet($def['data_type']) && $def['data_type'] == "filter" ){ continue; }
+			if( array_key_exists('store',$def) == FALSE || (array_key_exists('store',$def) == TRUE && $def['store'] == TRUE ) ){
 
-				forEach($this->table_definition as $name => $def){
-					if( isSet($def['data_type']) && $def['data_type'] == "filter" ){ continue; }
-				if( array_key_exists('store',$def) == FALSE || (array_key_exists('store',$def) == TRUE && $def['store'] == TRUE ) ){
+				if( !empty($sql) ){ $sql .= ','; }
+					if( isSet($def['data_type']) ){
+						$data_type = $this->getDataType($def);
+						$sql .= $name . str_replace('size',str_replace(')','',$data_type['size']),$data_types[$data_type['data_type']]['sql']);
+					}
 
-					if( !empty($sql) ){ $sql .= ','; }
-						if( isSet($def['data_type']) ){
-							$data_type = $this->getDataType($def);
-							$sql .= $name . str_replace('size',str_replace(')','',$data_type['size']),$data_types[$data_type['data_type']]['sql']);
-						}
+					if( array_key_exists('primary_key',$def) && $def['primary_key'] === TRUE  ){
+						$this->primary_key_column = $name;
+						$sql .= $name . ' INT UNSIGNED NOT NULL AUTO_INCREMENT ';
+					}
+			}
+			}
 
-						if( array_key_exists('primary_key',$def) && $def['primary_key'] === TRUE  ){
-							$this->primary_key_column = $name;
-							$sql .= $name . ' INT UNSIGNED NOT NULL AUTO_INCREMENT ';
-						}
-				}
-				}
+			$sql = 'CREATE TABLE IF NOT EXISTS ' . $this->table . ' ( ' . $sql;
+			if( $this->enable_system_columns ){ $sql .= ', OCDT DATETIME, OCU INT UNSIGNED, OMDT DATETIME, OMU INT UNSIGNED '; }
+			if( !empty($this->primary_key_column) ){ $sql .= ', PRIMARY KEY (' . $this->primary_key_column . ') ) ENGINE='.$this->oDBOConnection->getDBEngine().' DEFAULT CHARSET='.$this->oDBOConnection->getDBCharSet().'; '; }
 
-				$sql = 'CREATE TABLE IF NOT EXISTS ' . $this->table . ' ( ' . $sql;
-				if( $this->enable_system_columns ){ $sql .= ', OCDT DATETIME, OCU INT UNSIGNED, OMDT DATETIME, OMU INT UNSIGNED '; }
-				if( !empty($this->primary_key_column) ){ $sql .= ', PRIMARY KEY (' . $this->primary_key_column . ') ) ENGINE='.__OBRAY_DATABASE_ENGINE__.' DEFAULT CHARSET='.__OBRAY_DATABASE_CHARACTER_SET__.'; '; }
+			$this->sql = $sql;
+			$statement = $this->oDBOConnection->connect()->prepare($sql);
+			$this->script = $statement->execute();
 
-				$this->sql = $sql;
-				$statement = $this->dbh->prepare($sql);
-				$this->script = $statement->execute();
+		}
+
+		public function scriptOnMissingTable( $e ){
+
+			$matches = array();
+			preg_match( '/([\'][a-zA-Z0-9]+[\.])([a-zA-Z0-9]+)/', $e->errorInfo[2], $matches );
+			if( !empty($matches[2]) ){
+				$class = new \ReflectionClass($this);
+
+				// parse class root path
+				$class_path = explode('\\',$class->getName());
+				array_pop( $class_path ) ;
+				$class_path = implode('\\',$class_path);
+				
+				// create object and script tables
+				$object = '\\'.$class_path.'\\'.$matches[2];
+				$object = new $object();
+				$object->setDatabaseConnection($this->oDBOConnection);
+				$object->scriptTable();
+				$this->getRolesAndPermissions();
+			}
 
 		}
 
 		/*************************************************************************************************************
 
-		ALTERTABLE
+			ALTERTABLE
 
 		*************************************************************************************************************/
 
 		public function alterTable(){
-			if( empty($this->dbh) ){ return $this; }
+			if( empty($this->oDBOConnection->connect()) ){ return $this; }
 
 			$sql = 'DESCRIBE '.$this->table.';';
-			$statement = $this->dbh->prepare($sql);
+			$statement = $this->oDBOConnection->connect()->prepare($sql);
 			$statement->execute();
 
-			$statement->setFetchMode(PDO::FETCH_OBJ);
+			$statement->setFetchMode(\PDO::FETCH_OBJ);
 			$data = $statement->fetchAll();
 
 			$temp_def = $this->table_definition;
@@ -196,7 +219,7 @@
 								if( str_replace('size',$data_type['size'],$data_types[$data_type['data_type']]['my_sql_type']) != $def->Type ){
 									if( !isSet($this->table_alterations) ){ $this->table_alterations = array(); }
 									$sql = 'ALTER TABLE '.$this->table.' MODIFY COLUMN '.$def->Field.' '.str_replace('size',$data_type['size'],$data_types[$data_type['data_type']]['sql']);
-									$statement = $this->dbh->prepare($sql);
+									$statement = $this->oDBOConnection->connect()->prepare($sql);
 									$this->table_alterations[] = $statement->execute();
 								}
 							}
@@ -206,7 +229,7 @@
 							if( $this->enable_column_removal && isSet($_REQUEST['enableDrop']) ){
 								if( !isSet($this->table_alterations) ){ $this->table_alterations = array(); }
 								$sql = 'ALTER TABLE '.$this->table.' DROP COLUMN '.$def->Field.' ';
-								$statement = $this->dbh->prepare($sql);
+								$statement = $this->oDBOConnection->connect()->prepare($sql);
 								$this->table_alterations[] = $statement->execute();
 							}
 						}
@@ -222,7 +245,7 @@
 						if( !isSet($this->table_alterations) ){ $this->table_alterations = array(); }
 						$data_type = $this->getDataType($def);
 						$sql = 'ALTER TABLE '.$this->table.' ADD ('.$key.' '.str_replace('size',$data_type['size'],$data_types[$data_type['data_type']]['sql']).')';
-						$statement = $this->dbh->prepare($sql);
+						$statement = $this->oDBOConnection->connect()->prepare($sql);
 						$this->table_alterations[] = $statement->execute();
 					}
 				}
@@ -258,7 +281,7 @@
 
 		public function add($params=array()){
 
-			if( empty($this->dbh) ){ return $this; }
+			if( empty($this->oDBOConnection->connect()) ){ return $this; }
 
 			$sql = '';$sql_values = '';$data = array();
 			$this->data_types = unserialize(__OBRAY_DATATYPES__);
@@ -316,17 +339,17 @@
 			}
 
 			$this->sql  = ' INSERT INTO '.$this->table.' ( '.$sql.$system_columns.' ) values ( '.$sql_values.$system_values.' ) ';
-			$statement = $this->dbh->prepare($this->sql);
+			$statement = $this->oDBOConnection->connect()->prepare($this->sql);
 			forEach( $data as $key => $dati ){
 				if( $dati === 'NULL' ){
-					$statement->bindValue($key, null, PDO::PARAM_NULL);
+					$statement->bindValue($key, null, \PDO::PARAM_NULL);
 				} else {
 					$statement->bindValue($key, $dati);
 				}
 			}
 			$this->script = $statement->execute();
 			if( empty($this->is_transaction) ){
-					$get_params = array( $this->primary_key_column => $this->dbh->lastInsertId() );
+					$get_params = array( $this->primary_key_column => $this->oDBOConnection->connect()->lastInsertId() );
 					if( !empty($option_is_set) ){ $get_params["with"] = "options"; }
 					$this->get( $get_params );
 				}
@@ -339,7 +362,7 @@
 
 		public function update($params=array()){
 
-			if( empty($this->dbh) ){ return $this; }
+			if( empty($this->oDBOConnection->connect()) ){ return $this; }
 
 			$sql = ''; $sql_values = ''; $data = array();
 			$this->data_types = unserialize(__OBRAY_DATATYPES__);
@@ -397,10 +420,10 @@
 			}
 
 			$this->sql  = ' UPDATE '.$this->table.' SET '.$sql.$system_columns.' WHERE '.$this->primary_key_column.' = :'.$this->primary_key_column.' ';
-			$statement = $this->dbh->prepare($this->sql);
+			$statement = $this->oDBOConnection->connect()->prepare($this->sql);
 			forEach( $data as $key => $dati ){
 				if( $dati == 'NULL' ){
-					$statement->bindValue($key, null, PDO::PARAM_NULL);
+					$statement->bindValue($key, null, \PDO::PARAM_NULL);
 				} else {
 					$statement->bindValue($key, $dati);
 				}
@@ -424,7 +447,7 @@
 
 		public function delete($params=array()){
 
-			if( empty($this->dbh) ){ return $this; }
+			if( empty($this->oDBOConnection->connect()) ){ return $this; }
 			$original_params = $params;
 
 			$this->where = $this->getWhere($params,$values);
@@ -433,8 +456,8 @@
 				if( !empty( $this->errors ) ){ return $this; }
 
 			$this->sql  = ' DELETE FROM ' . $this->table . $this->where;
-			$statement = $this->dbh->prepare($this->sql);
-			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), PDO::PARAM_STR); } }
+			$statement = $this->oDBOConnection->connect()->prepare($this->sql);
+			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
 			$this->script = $statement->execute();
 
 
@@ -526,11 +549,11 @@
 			$where_str = $this->getWhere($params,$values,$original_params);
 
 			$this->sql = 'SELECT '.implode(',',$columns).' FROM '.$this->table . $this->getJoin() . $filter_join .$where_str . $order_by . $limit;
-			$statement = $this->dbh->prepare($this->sql);
-			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), PDO::PARAM_STR); } }
+			$statement = $this->oDBOConnection->connect()->prepare($this->sql);
+			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
 				$statement->execute();
-				$statement->setFetchMode(PDO::FETCH_NUM);
-				$data = $statement->fetchAll(PDO::FETCH_OBJ);
+				$statement->setFetchMode(\PDO::FETCH_NUM);
+				$data = $statement->fetchAll(\PDO::FETCH_OBJ);
 				
 			$this->data = $data;
 
@@ -785,7 +808,7 @@
 			$params = array('slug'=>strtolower(removeSpecialChars(str_replace('-'.($i-1),'',$new_slug).$appendage,'-','and')));
 			if( !empty($parent) && isSet($this->parent_column) ){ $parent_sql = ' AND '.$this->parent_column.' = :'.$this->parent_column.' '; $params[$this->parent_column] = $parent; } else { $parent_sql = ''; }
 			$sql = ' SELECT '.$column.' FROM '.$this->table.' WHERE '.$this->slug_value_column.' = :slug '.$parent_sql.' ';
-			$statement = $this->dbh->prepare($sql);
+			$statement = $this->oDBOConnection->connect()->prepare($sql);
 			$statement->execute($params);
 			$count = count($statement->fetchAll());
 			++$i;
@@ -908,11 +931,11 @@
 			$sql = $sql["sql"];
 		}
 		try {
-			$statement = $this->dbh->prepare($sql);
+			$statement = $this->oDBOConnection->connect()->prepare($sql);
 			$result = $statement->execute();
 			$this->data = [];
 			if (preg_match("/^select/i", $sql)) {
-			$statement->setFetchMode(PDO::FETCH_OBJ);
+			$statement->setFetchMode(\PDO::FETCH_OBJ);
 
 			while ($row = $statement->fetch()) {
 				$this->data[] = $row;
@@ -939,7 +962,7 @@
 				
 		try {
 					
-					$result = $this->dbh->query('EXPLAIN ' . $sql);
+					$result = $this->oDBOConnection->connect()->query('EXPLAIN ' . $sql);
 					forEach( $result as $r ){
 						$this->console($r);
 					}
@@ -975,7 +998,7 @@
 		}
 
 		$procString = "CALL " . $proc . "(" . $paramString . ")";
-		$statement = $this->dbh->prepare($procString);
+		$statement = $this->oDBOConnection->connect()->prepare($procString);
 		if ($paramCount > 0) {
 			foreach ($params as $paramName => $paramValue) {
 			$statement->bindValue(':' . $paramName, $paramValue);
@@ -984,7 +1007,7 @@
 
 		try {
 			$statement->execute();
-			$statement->setFetchMode(PDO::FETCH_OBJ);
+			$statement->setFetchMode(\PDO::FETCH_OBJ);
 			$this->data = $statement->fetchAll();
 		} catch (Exception $e) {
 			if(isset($this->is_transaction) && $this->is_transaction){
@@ -1007,8 +1030,8 @@
 				$values = array();
 				$where_str = $this->getWhere($params,$values);
 				$this->sql = 'SELECT COUNT(*) as count FROM '.$this->table.' '.$where_str;
-			$statement = $this->dbh->prepare($this->sql);
-			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), PDO::PARAM_STR); } }
+			$statement = $this->oDBOConnection->connect()->prepare($this->sql);
+			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
 			$statement->execute();
 			while ($row = $statement->fetch()) { $this->data[] = $row; }
 			$this->data = $this->data[0];
@@ -1028,11 +1051,11 @@
 				if( !empty($params['rows']) && is_numeric($params['rows']) ){ $rows = $params['rows']; } else { $rows = 1; }
 				$values = array();
 				$where_str = $this->getWhere($params,$values);
-			$statement = $this->dbh->prepare('SELECT * FROM '.$this->table.' '.$where_str.' ORDER BY RAND() LIMIT '.$rows);
-			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), PDO::PARAM_STR); } }
+			$statement = $this->oDBOConnection->connect()->prepare('SELECT * FROM '.$this->table.' '.$where_str.' ORDER BY RAND() LIMIT '.$rows);
+			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
 			$statement->execute();
-			$statement->setFetchMode(PDO::FETCH_NUM);
-			$this->data = $statement->fetchAll(PDO::FETCH_OBJ);
+			$statement->setFetchMode(\PDO::FETCH_NUM);
+			$this->data = $statement->fetchAll(\PDO::FETCH_OBJ);
 			return $this;
 
 		}
@@ -1048,7 +1071,7 @@
 		public function maximum( $params=array() ){  $this->math('MAX','maximum',$params); }
 		public function minimum( $params=array() ){  $this->math('MIN','minimum',$params); }
 		public function truncate(){
-			$statement = $this->dbh->prepare('TRUNCATE TABLE '.$this->table);
+			$statement = $this->oDBOConnection->connect()->prepare('TRUNCATE TABLE '.$this->table);
 			$statement->execute();
 		}
 
@@ -1058,8 +1081,8 @@
 				if( array_key_exists($column,$this->table_definition) ){
 					$values = array();
 					$where_str = $this->getWhere($params,$values);
-				$statement = $this->dbh->prepare('SELECT '.$fn.'('.$column.') as '.$key.' FROM '.$this->table.' '.$where_str);
-				forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), PDO::PARAM_STR); } }
+				$statement = $this->oDBOConnection->connect()->prepare('SELECT '.$fn.'('.$column.') as '.$key.' FROM '.$this->table.' '.$where_str);
+				forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
 				$statement->execute();
 				while ($row = $statement->fetch()) { $this->data[] = $row; }
 				$this->data = $this->data[0];
@@ -1084,8 +1107,8 @@
 				if( array_key_exists($column,$this->table_definition) ){
 					$values = array();
 					$where_str = $this->getWhere($params,$values);
-				$statement = $this->dbh->prepare('SELECT DISTINCT '.$column.' FROM '.$this->table.' '.$where_str);
-				forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), PDO::PARAM_STR); } }
+				$statement = $this->oDBOConnection->connect()->prepare('SELECT DISTINCT '.$column.' FROM '.$this->table.' '.$where_str);
+				forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
 				$statement->execute();
 				while ($row = $statement->fetch()) { $this->data[] = $row[$column]; }
 				return $this;
@@ -1105,15 +1128,15 @@
 
 			if(__OBRAY_DEBUG_MODE__){
 				$sql = 'CREATE TABLE IF NOT EXISTS ologs ( olog_id INT UNSIGNED NOT NULL AUTO_INCREMENT,olog_label VARCHAR(255),olog_data TEXT,OCDT DATETIME,OCU INT UNSIGNED, PRIMARY KEY (olog_id) ) ENGINE='.__OBRAY_DATABASE_ENGINE__.' DEFAULT CHARSET='.__OBRAY_DATABASE_CHARACTER_SET__.'; ';
-					$statement = $this->dbh->prepare($sql); $statement->execute();
+					$statement = $this->oDBOConnection->connect()->prepare($sql); $statement->execute();
 			}
 
 			$sql = 'INSERT INTO ologs(olog_label,olog_data,OCDT,OCU) VALUES(:olog_label,:olog_data,:OCDT,:OCU);';
-			$statement = $this->dbh->prepare($sql);
-			$statement->bindValue('olog_label',$label, PDO::PARAM_STR);
-			$statement->bindValue('olog_data',json_encode($object,JSON_PRETTY_PRINT),PDO::PARAM_STR);
-			$statement->bindValue('OCDT',date('Y-m-d H:i:s'), PDO::PARAM_STR);
-			$statement->bindValue('OCU',isSet($_SESSION['ouser']->ouser_id)?$_SESSION['ouser']->ouser_id:0, PDO::PARAM_INT);
+			$statement = $this->oDBOConnection->connect()->prepare($sql);
+			$statement->bindValue('olog_label',$label, \PDO::PARAM_STR);
+			$statement->bindValue('olog_data',json_encode($object,JSON_PRETTY_PRINT),\PDO::PARAM_STR);
+			$statement->bindValue('OCDT',date('Y-m-d H:i:s'), \PDO::PARAM_STR);
+			$statement->bindValue('OCU',isSet($_SESSION['ouser']->ouser_id)?$_SESSION['ouser']->ouser_id:0, \PDO::PARAM_INT);
 			$statement->execute();
 
 		}
