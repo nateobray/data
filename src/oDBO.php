@@ -37,10 +37,11 @@
 
 	Class oDBO extends \obray\oObject {
 
-		protected $oDBOConnection;
 		public $enable_system_columns = TRUE;
 
 		public function __construct(){
+
+			parent::__construct();
 
 			$this->primary_key_column = '';
 			$this->data_types = array();
@@ -57,15 +58,15 @@
 			if( !defined('__OBRAY_DATATYPES__') ){
 
 				define ('__OBRAY_DATATYPES__', serialize (array (
-				'varchar'   	=>  array('sql'=>' VARCHAR(size) COLLATE utf8_general_ci ',		'my_sql_type'=>'varchar(size)',		'validation_regex'=>''),
-				'mediumtext'	=>  array('sql'=>' MEDIUMTEXT COLLATE utf8_general_ci ',		'my_sql_type'=>'mediumtext',		'validation_regex'=>''),
-				'text'      	=>  array('sql'=>' TEXT COLLATE utf8_general_ci ',				'my_sql_type'=>'text',				'validation_regex'=>''),
-				'integer'   	=>  array('sql'=>' int ',										'my_sql_type'=>'int(11)',			'validation_regex'=>'/^([+,-]?[0-9])*$/'),
-				'uninteger'		=>	array('sql'=>' int(11) unsigned NOT NULL DEFAULT \'0\'  ',	'my_sql_type'=>'int(11) unsigned',	'validation_regex'=>'/^([+,-]?[0-9])*$/'),
-				'float'     	=>  array('sql'=>' float ',										'my_sql_type'=>'float',				'validation_regex'=>'/[0-9\.]*/'),
-				'boolean'   	=>  array('sql'=>' tinyint(1) ',								'my_sql_type'=>'tinyint(1)',		'validation_regex'=>''),
-				'datetime'  	=>  array('sql'=>' datetime ',									'my_sql_type'=>'datetime',			'validation_regex'=>''),
-				'password'  	=>  array('sql'=>' varchar(255) ',								'my_sql_type'=>'varchar(255)',		'validation_regex'=>'')
+				'varchar'   	=> array('sql'=>' VARCHAR(size) COLLATE utf8_general_ci ',	'my_sql_type'=>'varchar(size)',		'validation_regex'=>''),
+				'mediumtext'	=> array('sql'=>' MEDIUMTEXT COLLATE utf8_general_ci ',		'my_sql_type'=>'mediumtext',		'validation_regex'=>''),
+				'text'      	=> array('sql'=>' TEXT COLLATE utf8_general_ci ',		'my_sql_type'=>'text',			'validation_regex'=>''),
+				'integer'   	=> array('sql'=>' int ',					'my_sql_type'=>'int(11)',		'validation_regex'=>'/^([+,-]?[0-9])*$/'),
+				'uninteger'	=> array('sql'=>' int(11) unsigned NOT NULL DEFAULT \'0\'  ',	'my_sql_type'=>'int(11) unsigned',	'validation_regex'=>'/^([+,-]?[0-9])*$/'),
+				'float'     	=> array('sql'=>' float ',					'my_sql_type'=>'float',			'validation_regex'=>'/[0-9\.]*/'),
+				'boolean'   	=> array('sql'=>' tinyint(1) ',					'my_sql_type'=>'tinyint(1)',		'validation_regex'=>''),
+				'datetime'  	=> array('sql'=>' datetime ',					'my_sql_type'=>'datetime',		'validation_regex'=>''),
+				'password'  	=> array('sql'=>' varchar(255) ',				'my_sql_type'=>'varchar(255)',		'validation_regex'=>'')
 				)));
 
 			}
@@ -80,7 +81,7 @@
 		public function commitTransaction(){
 			if(!$this->is_transaction){
 				return;  //This likely means that the transaction was rolled back and should therefore not be committed. (that or there was never a transaction to begin with).
-				}
+			}
 			$this->oDBOConnection->connect()->commit();
 			$this->is_transaction = FALSE;
 		}
@@ -347,7 +348,23 @@
 					$statement->bindValue($key, $dati);
 				}
 			}
-			$this->script = $statement->execute();
+			try{
+
+				$this->script = $statement->execute();
+
+			} catch( \PDOException $e ){
+
+				if( !empty($e->errorInfo[1]) && $e->errorInfo[1] == 1146 ){
+					$this->scriptOnMissingTable($e);
+					$this->add( $params );					
+					return $this;
+				}
+
+				$this->throwError("Database error occurred.");
+				return $this;
+
+			}
+			
 			if( empty($this->is_transaction) ){
 					$get_params = array( $this->primary_key_column => $this->oDBOConnection->connect()->lastInsertId() );
 					if( !empty($option_is_set) ){ $get_params["with"] = "options"; }
@@ -551,9 +568,25 @@
 			$this->sql = 'SELECT '.implode(',',$columns).' FROM '.$this->table . $this->getJoin() . $filter_join .$where_str . $order_by . $limit;
 			$statement = $this->oDBOConnection->connect()->prepare($this->sql);
 			forEach($values as $value){ if( is_integer($value) ){ $statement->bindValue($value['key'], trim($value['value']), \PDO::PARAM_INT); } else { $statement->bindValue($value['key'], trim((string)$value['value']), \PDO::PARAM_STR); } }
+			try{
+
 				$statement->execute();
 				$statement->setFetchMode(\PDO::FETCH_NUM);
 				$data = $statement->fetchAll(\PDO::FETCH_OBJ);
+
+			} catch( \PDOException $e ){
+
+				if( !empty($e->errorInfo[1]) && $e->errorInfo[1] == 1146 ){
+					$this->scriptOnMissingTable($e);
+					$this->get( $original_params );					
+					return $this;
+				}
+
+				$this->throwError("Database error occurred.");
+				return $this;
+
+			}
+				
 				
 			$this->data = $data;
 
