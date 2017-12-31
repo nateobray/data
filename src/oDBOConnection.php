@@ -43,6 +43,8 @@
                 private $is_connected = FALSE;
 
                 public function __construct($host,$username,$password,$db_name,$port='3306',$db_engine='innoDB',$char_set="utf8"){
+                        
+                        
                         $this->host = $host;
                         $this->username = $username;
                         $this->password = $password;
@@ -86,16 +88,18 @@
 
                 public function connect( $reconnect=FALSE ){
                         
-                        if( !isSet( $this->conn ) || $reconnect ){
+                        global $conn;
+                        
+                        if( !isSet( $conn ) || $reconnect ){
                                 try {
-                                        $this->conn = new \PDO(
+                                        $conn = new \PDO(
                                                 'mysql:host='.$this->host.';dbname='.$this->db_name.';charset=utf8',
                                                 $this->username,
                                                 $this->password,
                                                 array(
                                                         \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8'
                                                 ));
-                                        $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+                                        $conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
                                         $this->is_connected = TRUE;
                                 } catch(\PDOException $e) {
                                         echo 'ERROR: ' . $e->getMessage(); 
@@ -103,7 +107,7 @@
                                 }
                         }
 
-                        return $this->conn;
+                        return $conn;
 
                 }
 
