@@ -1,30 +1,5 @@
 <?php
 
-/*****************************************************************************
- *
- * The MIT License (MIT)
- *
- * Copyright (c) 2014 Nathan A Obray <nathanobray@gmail.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the 'Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *****************************************************************************/
-
 namespace obray;
 
 if (!class_exists(\obray\oObject::class)) {
@@ -72,6 +47,7 @@ Class oDBO extends \obray\oObject
     public function __construct(\obray\oDBOConnection $oDBOConnection)
     {
         $this->oDBOConnection = $oDBOConnection;
+        
     }
 
     public function startTransaction()
@@ -614,7 +590,7 @@ Class oDBO extends \obray\oObject
 
     public function get($params = array())
     {
-
+        
         $original_params = $params;
 
         if (!empty($this->enable_system_columns)) {
@@ -677,7 +653,7 @@ Class oDBO extends \obray\oObject
         $columns = array();
         $withs_to_pass = array();
         $filter_columns = array();
-
+        
         forEach ($this->table_definition as $column => $def) {
             if (isSet($def['data_type']) && $def['data_type'] == "filter") {
                 $filter_columns[] = $columns;
@@ -718,7 +694,6 @@ Class oDBO extends \obray\oObject
                 }
             }
         }
-
 
         $filter_join = "";
         forEach ($withs as $i => $w) {
@@ -1277,19 +1252,36 @@ Class oDBO extends \obray\oObject
      * RUN
      ********************************************************************/
 
-    public function run($sql)
+    public function run($sql,$bind=array())
     {
 
-        if (is_array($sql)) {
-            $sql = $sql["sql"];
+        // prepare statement
+        try{
+            $statement = $this->prepareSql($sql);
+        } catch(\obray\exceptions\SqlFileNotFound $e) {
+            
+            if (is_array($sql)) {
+                $sql = $sql["sql"];
+            }
+            try{
+                $statement = $this->oDBOConnection->prepare($sql);
+            } catch(\Exception $e ) {
+                if (isset($this->is_transaction) && $this->is_transaction) {
+                    $this->rollbackTransaction();
+                }
+                $this->throwError($e);
+                $this->logError(oCoreProjectEnum::ODBO, $e);
+                return;
+            }
+        
         }
-        try {
-            $statement = $this->oDBOConnection->prepare($sql);
-            $result = $statement->execute();
-            $this->data = [];
-            if (preg_match("/^select/i", $sql)) {
-                $statement->setFetchMode(\PDO::FETCH_OBJ);
 
+        // execute statement
+        try {
+            $result = $statement->execute($bind);
+            $this->data = [];
+            if ($statement->rowCount() > 0) {
+                $statement->setFetchMode(\PDO::FETCH_OBJ);
                 while ($row = $statement->fetch()) {
                     $this->data[] = $row;
                 }
@@ -1305,6 +1297,58 @@ Class oDBO extends \obray\oObject
         }
 
         return $this;
+    }
+
+    /**
+     * Load SQL
+     *  Loads an SQL File from the data layer directory
+     *
+     * @param string $file sql file path relative to the root 'data' directory
+     *
+     * @throws SqlFileNotFoundException
+     * @throws SqlFileFailedToLoadException
+     *
+     * @return string The contents of the file loaded
+     **/
+    protected function loadSql($file)
+    {
+        $file = preg_replace('#/+#','/','data/'.$file);
+
+        /*
+        -- TODO --
+        // check if file is cached, if so, load from cache
+        if( $this->isSqlCached($file) ) {
+            $sql = $this->loadSqlFromCache($file);
+        }
+        -- TODO --
+        */
+
+        if (($path = realpath($file)) === false) {
+            throw new \obray\exceptions\SqlFileNotFound();
+        }
+
+        $contents = file_get_contents($path);
+
+        if ($contents === false) {
+            throw new \obray\exceptions\SqlFileFailedToLoad();
+        }
+
+        return $contents;
+    }
+
+    /**
+     * Prepare SQL
+     *  Loads and prepares an sql file with PDO::prepare
+     *
+     * @param string $file sql file path
+     *
+     * @return \PDOStatement
+     */
+    protected function prepareSql($file)
+    {
+        $sql = $this->loadSql($file);
+        $conn = $this->oDBOConnection->getConnection();
+        return $conn->prepare($sql);
     }
 
     public function explain($sql)
@@ -1545,58 +1589,6 @@ Class oDBO extends \obray\oObject
             \PDO::PARAM_INT);
         $statement->execute();
 
-    }
-
-    /**
-     * Load SQL
-     *  Loads an SQL File from the data layer directory
-     *
-     * @param string $file sql file path relative to the root 'data' directory
-     *
-     * @throws SqlFileNotFoundException
-     * @throws SqlFileFailedToLoadException
-     *
-     * @return string The contents of the file loaded
-     **/
-    protected function loadSql($file)
-    {
-        $file = preg_replace('#/+#','/','data/'.$file);
-
-        /*
-        -- TODO --
-        // check if file is cached, if so, load from cache
-        if( $this->isSqlCached($file) ) {
-            $sql = $this->loadSqlFromCache($file);
-        }
-        -- TODO --
-        */
-
-        if (($path = realpath($file)) === false) {
-            throw new \obray\exceptions\SqlFileNotFound();
-        }
-
-        $contents = file_get_contents($path);
-
-        if ($contents === false) {
-            throw new \obray\exceptions\SqlFileFailedToLoad();
-        }
-
-        return $contents;
-    }
-
-    /**
-     * Prepare SQL
-     *  Loads and prepares an sql file with PDO::prepare
-     *
-     * @param string $file sql file path
-     *
-     * @return \PDOStatement
-     */
-    protected function prepareSql($file)
-    {
-        $sql = $this->loadSql($file);
-        $conn = $this->oDBOConnection->getConnection();
-        return $conn->prepare($sql);
     }
 
     /********************************************************************
