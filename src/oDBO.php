@@ -205,8 +205,6 @@ Class oDBO extends \obray\oObject
             unset($this->table_definition[$of]);
         }
 
-        $data_types = unserialize(__OBRAY_DATATYPES__);
-
         forEach ($data as $def) {
             if (isSet($def->data_type) && $def->data_type == "filter") {
                 continue;
@@ -448,8 +446,7 @@ Class oDBO extends \obray\oObject
         $sql = '';
         $sql_values = '';
         $data = array();
-        $this->data_types = unserialize(__OBRAY_DATATYPES__);
-
+        
         $this->getWorkingDef();
 
         /*
