@@ -47,7 +47,7 @@ Class oDBO extends \obray\oObject
     public function __construct(\obray\oDBOConnection $oDBOConnection)
     {
         $this->oDBOConnection = $oDBOConnection;
-        
+
     }
 
     public function startTransaction()
@@ -446,7 +446,7 @@ Class oDBO extends \obray\oObject
         $sql = '';
         $sql_values = '';
         $data = array();
-        
+
         $this->getWorkingDef();
 
         /*
@@ -587,7 +587,7 @@ Class oDBO extends \obray\oObject
 
     public function get($params = array())
     {
-        
+
         $original_params = $params;
 
         if (!empty($this->enable_system_columns)) {
@@ -650,7 +650,7 @@ Class oDBO extends \obray\oObject
         $columns = array();
         $withs_to_pass = array();
         $filter_columns = array();
-        
+
         forEach ($this->table_definition as $column => $def) {
             if (isSet($def['data_type']) && $def['data_type'] == "filter") {
                 $filter_columns[] = $columns;
@@ -1249,103 +1249,29 @@ Class oDBO extends \obray\oObject
      * RUN
      ********************************************************************/
 
-    public function run($sql,$bind=array())
+    public function run($sql, $bind = [])
     {
+        $statement = $this->oDBOConnection->prepare($sql);
+        $statement->bindValues($bind);
+        $result = $statement->execute();
 
-        // prepare statement
-        try{
-            $statement = $this->prepareSql($sql);
-        } catch(\obray\exceptions\SqlFileNotFound $e) {
-            
-            if (is_array($sql)) {
-                $sql = $sql["sql"];
-            }
-            try{
-                $statement = $this->oDBOConnection->prepare($sql);
-            } catch(\Exception $e ) {
-                if (isset($this->is_transaction) && $this->is_transaction) {
-                    $this->rollbackTransaction();
-                }
-                $this->throwError($e);
-                $this->logError(oCoreProjectEnum::ODBO, $e);
-                return;
-            }
-        
+        $rowCount = $statement->rowCount();
+        if ($rowCount > 0) {
+            $this->data = $statement->fetchAll(\PDO::FETCH_OBJ);
+        } else {
+            $this->data = $result;
         }
-
-        // execute statement
-        try {
-            $result = $statement->execute($bind);
-            $this->data = [];
-            if ($statement->rowCount() > 0) {
-                $statement->setFetchMode(\PDO::FETCH_OBJ);
-                while ($row = $statement->fetch()) {
-                    $this->data[] = $row;
-                }
-            } else {
-                $this->data = $result;
-            }
-        } catch (Exception $e) {
-            if (isset($this->is_transaction) && $this->is_transaction) {
-                $this->rollbackTransaction();
-            }
-            $this->throwError($e);
-            $this->logError(oCoreProjectEnum::ODBO, $e);
-        }
-
-        return $this;
+        return $this->data;
     }
 
-    /**
-     * Load SQL
-     *  Loads an SQL File from the data layer directory
+    /********************************************************************
      *
-     * @param string $file sql file path relative to the root 'data' directory
-     *
-     * @throws SqlFileNotFoundException
-     * @throws SqlFileFailedToLoadException
-     *
-     * @return string The contents of the file loaded
-     **/
-    protected function loadSql($file)
+     * RUN
+     ********************************************************************/
+
+    public function load($sql)
     {
-        $file = preg_replace('#/+#','/','data/'.$file);
-
-        /*
-        -- TODO --
-        // check if file is cached, if so, load from cache
-        if( $this->isSqlCached($file) ) {
-            $sql = $this->loadSqlFromCache($file);
-        }
-        -- TODO --
-        */
-
-        if (($path = realpath($file)) === false) {
-            throw new \obray\exceptions\SqlFileNotFound();
-        }
-
-        $contents = file_get_contents($path);
-
-        if ($contents === false) {
-            throw new \obray\exceptions\SqlFileFailedToLoad();
-        }
-
-        return $contents;
-    }
-
-    /**
-     * Prepare SQL
-     *  Loads and prepares an sql file with PDO::prepare
-     *
-     * @param string $file sql file path
-     *
-     * @return \PDOStatement
-     */
-    protected function prepareSql($file)
-    {
-        $sql = $this->loadSql($file);
-        $conn = $this->oDBOConnection->getConnection();
-        return $conn->prepare($sql);
+        return $this->oDBOConnection->prepare($sql);
     }
 
     public function explain($sql)

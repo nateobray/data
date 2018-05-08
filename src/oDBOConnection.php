@@ -17,6 +17,9 @@ Class oDBOConnection
     private $db_engine;
     private $db_char_set;
 
+    /**
+     * @var \PDO The PDO Connection
+     */
     private $conn;
     private $is_connected = false;
 
@@ -78,6 +81,10 @@ Class oDBOConnection
         return $this->db_char_set;
     }
 
+    /**
+     * @param bool $reconnect
+     * @return \PDO
+     */
     public function connect($reconnect = false)
     {
         $this->conn;
@@ -100,6 +107,9 @@ Class oDBOConnection
         return $this->conn;
     }
 
+    /**
+     * @return \PDO
+     */
     public function getConnection()
     {
         if (!$this->is_connected) {
@@ -108,9 +118,23 @@ Class oDBOConnection
         return $this->conn;
     }
 
+    /**
+     * @return bool
+     */
     public function isConnected()
     {
         return $this->is_connected;
+    }
+
+    /**
+     * @param $sql
+     * @return oDBOStatement
+     */
+    public function prepare($sql)
+    {
+        $stmt = new oDBOStatement($this);
+        $stmt->loadSql($sql);
+        return $stmt;
     }
 
     public function __call($name, $arguments = array())
