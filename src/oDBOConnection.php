@@ -145,4 +145,19 @@ Class oDBOConnection
         }
     }
 
+    public function run($sql, $bind = [])
+    {
+        $statement = $this->prepare($sql);
+        $statement->bindValues($bind);
+        $result = $statement->execute();
+
+        $rowCount = $statement->rowCount();
+        if ($rowCount > 0) {
+            $this->data = $statement->fetchAll(\PDO::FETCH_OBJ);
+        } else {
+            $this->data = $result;
+        }
+        return $this->data;
+    }
+
 }
