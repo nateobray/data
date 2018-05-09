@@ -102,7 +102,7 @@ class oDBOStatement
             if (is_array($param)) {
                 $this->bindArray($key, $param);
             } else {
-                $this->bindValues($key, $param);
+                $this->bindValue($key, $param);
             }
         }
     }
@@ -255,7 +255,7 @@ class oDBOStatement
      * Load SQL
      *  Loads an SQL File from the data layer directory (/data/your/filepath/here.sql)
      *
-     * @param string $file sql file path relative to the root 'data' directory (i.e. 'orders/oShipments/select_shipments.sql')
+     * @param string $file absolute sql file path
      *
      * @throws SqlFileNotFoundException
      * @throws SqlFileFailedToLoadException
@@ -264,7 +264,7 @@ class oDBOStatement
      **/
     protected function loadSqlFile($file)
     {
-        $file = preg_replace('#/+#', '/', 'data/' . $file);
+        $file = preg_replace('#/+#', '/', $file);
 
         /*
         -- TODO --
