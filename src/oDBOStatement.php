@@ -30,29 +30,21 @@ class oDBOStatement
     protected $oDBOConnection;
 
     /**
-     * @var string
+     * @var string[]
      */
-    protected $queryString;
-    /**
-     * @var string
-     */
-    protected $orderString = '';
-    /**
-     * @var string
-     */
-    protected $limitString = '';
+    protected $queryStrings;
     /**
      * @var oDBOParam[]
      */
     protected $queryParams = [];
     /**
-     * @var oDBOParam[]
+     * @var \PDOStatement[]
      */
-    protected $preparedParams = [];
+    protected $pdoStatements = [];
     /**
-     * @var \PDOStatement
+     * @var mixed[]
      */
-    protected $stmt = false;
+    protected $results = [];
 
     /**
      * oDBOStatement constructor.
@@ -99,11 +91,7 @@ class oDBOStatement
     public function bindValues($params)
     {
         foreach ($params as $key => $param) {
-            if (is_array($param)) {
-                $this->bindArray($key, $param);
-            } else {
-                $this->bindValue($key, $param);
-            }
+            $this->bindValue($key, $param);
         }
     }
 
@@ -124,7 +112,7 @@ class oDBOStatement
     /**
      * @param $name
      * @param $param
-     * @param int $paramType
+     * @param int $paramType (Default \PDO::PARAM_STR)
      * @return $this
      * @throws \Exception
      */
@@ -136,80 +124,61 @@ class oDBOStatement
     }
 
     /**
-     * @param $name
-     * @param $params
-     * @param int $paramType
-     * @return $this
-     * @throws \Exception
+     * prepare
+     *  Prepares queries to be run and bind params to first query
      */
-    public function bindArray($name, $params, $paramType = \PDO::PARAM_STR)
+    private function prepare()
     {
-        if (!is_array($params)) {
-            throw new \Exception('Non-array value param received, array expected.');
-        }
+        $pdoConnection = $this->oDBOConnection->getConnection();
+        $this->pdoStatements = [];
+        foreach ($this->queryStrings as $index => $queryString) {
+            $this->pdoStatements[$index] = $pdoConnection->prepare($queryString);
 
-        $paramArray = [];
-        foreach ($params as $param) {
-            $paramArray[] = new oDBOParam($name, $param, $paramType);
+            // If first query, bind parameters
+            if ($index === 0) {
+                foreach ($this->queryParams as $param) {
+                    $this->pdoStatements[$index]->bindParam(
+                        $param->name,
+                        $param->param,
+                        $param->type
+                    );
+                }
+            }
         }
-        $this->addParam($name, $paramArray);
-        return $this;
-    }
-
-    public function orderBy($sortColumn, $sortDirection = 'ASC')
-    {
-        $sortDirection = strtoupper(trim($sortDirection));
-        if (!in_array($sortDirection, self::VALID_SORT_DIRECTIONS)) {
-            throw new \Exception('Invalid Sort Direction Passed');
-        }
-        if (preg_match('/\s/', $sortColumn)) {
-            throw new \Exception('Invalid Sort Column; Cannot contain spaces');
-        }
-
-        if (empty($this->orderString)) {
-            $this->orderString = "ORDER BY {$sortColumn} {$sortDirection}";
-        } else {
-            $this->orderString .= ", {$sortColumn} {$sortDirection}";
-        }
-    }
-
-    public function limit($limit, $offset = 0)
-    {
-        if (!empty($this->limitString)) {
-            throw new \Exception('Limit already set for query');
-        }
-        if (!self::isInteger($limit) || !self::isInteger($offset)) {
-            throw new \Exception('Limit and Offset must be integers');
-        }
-        $this->limitString = "LIMIT {$limit} OFFSET {$offset}";
     }
 
     /**
-     * @param $debug Variable to assign the debug data to
+     * execute
+     *  Executes the prepared queries
      */
-    public function execute(&$debug = null)
+    public function execute()
     {
-        // Setup debug object
-        $debug = new \stdClass();
-        $debug->query = null;
-        $debug->params = null;
+        $this->prepare();
+        if( empty($this->pdoStatements) ) {
+            throw new \Exception('No PDOStatements have been prepared. Failed to execute');
+        }
 
-        $this->prepare($debug->query, $debug->params);
-        return $this->stmt->execute();
+        foreach ($this->pdoStatements as $index => $pdoStatement) {
+            $this->results[$index] = $pdoStatement->execute();
+        }
+        return $this->results;
     }
 
     /**
-     * @param $query Variable to assign the executed query to
+     * FetchResults
+     *  Gets the results of each executed query and returns them in an array indexed by query number
+     * @param int $fetch_style PDO Fetch Style (defaults to FETCH_OBJ)
+     *
      */
-    protected function prepare(&$query = null, &$params = null)
+    public function fetchResults($fetchStyle = \PDO::FETCH_OBJ)
     {
-        $params = $this->prepareParams();
-        $conn = $this->oDBOConnection->getConnection();
-        $query = implode("\r\n", [$this->queryString, $this->orderString, $this->limitString]);
-        $this->stmt = $conn->prepare($query);
-        foreach ($params as $param) {
-            $this->stmt->bindParam($param->name, $param->param, $param->type);
+        foreach ($this->pdoStatements as $index => $pdoStatement) {
+            $resultCount = $pdoStatement->rowCount();
+            if ($resultCount > 0) {
+                $this->results[$index] = $pdoStatement->fetchAll($fetchStyle);
+            }
         }
+        return $this->results;
     }
 
     /**
@@ -225,7 +194,7 @@ class oDBOStatement
             $dbh = $this->oDBOConnection->getConnection();
             $pdoStatement = $dbh->prepare($sqlString);
             if ($pdoStatement !== false) {
-                $this->queryString = $sqlString;
+                $this->parseQueries($sqlString);
                 return;
             }
         } catch (\PDOException $e) {
@@ -243,7 +212,7 @@ class oDBOStatement
         // Attempt to load SQL from array
         try {
             if (is_array($sqlArray) && !empty($sqlArray['sql'])) {
-                $this->queryString = $sqlArray['sql'];
+                $this->parseQueries($sqlArray['sql']);
                 return;
             }
         } catch (\Exception $e) {
@@ -285,7 +254,16 @@ class oDBOStatement
             throw new \obray\exceptions\SqlFileFailedToLoad();
         }
 
-        $this->queryString = $contents;
+        $this->parseQueries($contents);
+    }
+
+    protected function parseQueries($sqlString)
+    {
+        $queries = explode(';', $sqlString);
+        $this->queryStrings = array_map(function ($queryString) {
+            $queryString = trim($queryString);
+            return $queryString;
+        }, $queries);
     }
 
     /**
@@ -302,53 +280,9 @@ class oDBOStatement
         $this->queryParams[$key] = $value;
     }
 
-    protected function prepareParams()
-    {
-        $this->preparedParams = [];
-        foreach ($this->queryParams as $name => $param) {
-            if (is_array($param)) {
-                $this->prepareArrayParam($name, $param);
-            } else {
-                $this->preparedParams[$name] = $param;
-            }
-        }
-        return $this->preparedParams;
-    }
-
-    protected function prepareArrayParam($name, $param)
-    {
-        $arrayParamNames = [];
-        $index = 0;
-        foreach ($param as $arrayParam) {
-            $arrayParam->name = $arrayParamNames[] = "{$name}_{$index}";
-            $this->preparedParams[$arrayParam->name] = $arrayParam;
-            $index++;
-        }
-
-        $replacementParam = implode(', ', $arrayParamNames);
-        $this->queryString = str_replace($name, $replacementParam, $this->queryString);
-    }
-
     protected static function isInteger($input)
     {
         return (ctype_digit(strval($input)));
-    }
-
-    /**
-     * @param $name
-     * @param array $arguments
-     * @return mixed
-     * @throws \Exception
-     */
-    public function __call($name, $arguments = array())
-    {
-        if (!$this->stmt) {
-            throw new \Exception('oDBOStatement::execute() must be called before calling PDOStatement methods.');
-        }
-        if (!method_exists($this->stmt, $name)) {
-            throw new \Exception("Method ({$name}) does not exist on oDBOStatement or PDOStatement");
-        }
-        return $this->stmt->$name(...$arguments);
     }
 
 }
