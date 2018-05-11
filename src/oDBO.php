@@ -428,7 +428,9 @@ Class oDBO extends \obray\oObject
                 $get_params["with"] = "options";
             }
             $this->get($get_params);
+            
         }
+        return $this;
 
     }
 
@@ -1282,40 +1284,7 @@ Class oDBO extends \obray\oObject
      * runStoredProc
      ********************************************************************/
 
-    public function runStoredProc($proc, $params = array())
-    {
-        $this->data = [];
-        $paramString = "";
-        $paramCount = 0;
-        foreach ($params as $paramName => $paramValue) {
-            if ($paramCount > 0) {
-                $paramString .= ",";
-            }
-            $paramString .= ":" . $paramName;
-            $paramCount++;
-        }
-
-        $procString = "CALL " . $proc . "(" . $paramString . ")";
-        $statement = $this->oDBOConnection->prepare($procString);
-        if ($paramCount > 0) {
-            foreach ($params as $paramName => $paramValue) {
-                $statement->bindValue(':' . $paramName, $paramValue);
-            }
-        }
-
-        try {
-            $statement->execute();
-            $statement->setFetchMode(\PDO::FETCH_OBJ);
-            $this->data = $statement->fetchAll();
-        } catch (Exception $e) {
-            if (isset($this->is_transaction) && $this->is_transaction) {
-                $this->rollbackTransaction();
-            }
-            $this->throwError($e);
-            $this->logError(oCoreProjectEnum::ODBO, $e);
-        }
-        return $this->data;
-    }
+   
 
     /********************************************************************
      *
