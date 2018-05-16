@@ -396,7 +396,7 @@ Class oDBO extends \obray\oObject
             $system_values = "";
         }
 
-        $this->sql = ' INSERT INTO ' . $this->table . ' ( ' . $sql . $system_columns . ' ) values ( ' . $sql_values . $system_values . ' ) ';
+        $this->sql = ' INSERT INTO ' . $this->table . ' ( ' . $sql . $system_columns . ' ) VALUES ( ' . $sql_values . $system_values . ' ) ';
         $statement = $this->oDBOConnection->prepare($this->sql);
         forEach ($data as $key => $dati) {
             if ($dati === 'NULL') {
@@ -1246,14 +1246,14 @@ Class oDBO extends \obray\oObject
         }
     }
 
-    public function run($sql, $bind = [])
+    public function run($sql, $bind = [], $fetchStyle = \PDO::FETCH_OBJ)
     {
-        return $this->data = $this->oDBOConnection->run($sql, $bind);
+        return $this->data = $this->oDBOConnection->run($sql, $bind, $fetchStyle);
     }
 
-    public function load($sql)
+    public function beginStatement($sql)
     {
-        return $this->oDBOConnection->prepare($sql);
+        return $this->oDBOConnection->beginStatement($sql);
     }
 
     public function explain($sql)
@@ -1296,7 +1296,7 @@ Class oDBO extends \obray\oObject
 
         $values = array();
         $where_str = $this->getWhere($params, $values);
-        $this->sql = 'SELECT COUNT(*) as count FROM ' . $this->table . ' ' . $where_str;
+        $this->sql = 'SELECT COUNT(*) AS count FROM ' . $this->table . ' ' . $where_str;
         $statement = $this->oDBOConnection->prepare($this->sql);
         forEach ($values as $value) {
             if (is_integer($value)) {

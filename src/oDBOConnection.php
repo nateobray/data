@@ -130,11 +130,11 @@ Class oDBOConnection
      * @param $sql
      * @return oDBOStatement
      */
-    public function prepare($sql)
+    public function beginStatement($sql)
     {
-        $stmt = new oDBOStatement($this);
-        $stmt->loadSql($sql);
-        return $stmt;
+        $oDBOStatement = new oDBOStatement($this);
+        $oDBOStatement->loadSql($sql);
+        return $oDBOStatement;
     }
 
     public function __call($name, $arguments = array())
@@ -145,19 +145,12 @@ Class oDBOConnection
         }
     }
 
-    public function run($sql, $bind = [])
+    public function run($sql, $bind = [], $fetchStyle = \PDO::FETCH_OBJ)
     {
-        $statement = $this->prepare($sql);
-        $statement->bindValues($bind);
-        $result = $statement->execute();
-
-        $rowCount = $statement->rowCount();
-        if ($rowCount > 0) {
-            $this->data = $statement->fetchAll(\PDO::FETCH_OBJ);
-        } else {
-            $this->data = $result;
-        }
-        return $this->data;
+        $oDBOStatement = $this->beginStatement($sql);
+        $oDBOStatement->bindValues($bind);
+        $oDBOStatement->execute();
+        return $oDBOStatement->fetchResults($fetchStyle);
     }
 
     public function runStoredProc($proc, $params = array())
