@@ -967,8 +967,8 @@ Class oDBO extends \obray\oObject
                         $value_keys = array();
                         forEach ($ors as $v) {
                             ++$count;
-                            $values[] = array('key' => ':' . $key . '_' . $count, 'value' => $v);
-                            $value_keys[] = ':' . $key . '_' . $count;
+                            $values[] = array('key' => ':' . $key . '_' . $count . '_', 'value' => $v);
+                            $value_keys[] = ':' . $key . '_' . $count . '_';
                         }
 
                         $where[] = array(
@@ -990,11 +990,11 @@ Class oDBO extends \obray\oObject
                                     $v = '%' . $v . '%';
                                 }
                                 ++$count;
-                                $values[] = array('key' => ':' . $key . '_' . $count, 'value' => $v);
+                                $values[] = array('key' => ':' . $key . '_' . $count . '_', 'value' => $v);
                                 $where[] = array(
                                     'join' => $or_key,
                                     'key' => $key,
-                                    'value' => ':' . $key . '_' . $count,
+                                    'value' => ':' . $key . '_' . $count . '_',
                                     'operator' => $operator
                                 );
                                 $or_key = 'OR';
