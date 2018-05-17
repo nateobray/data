@@ -249,7 +249,7 @@ class oDBOStatement
         }
 
         $contents = file_get_contents($path);
-
+        
         if ($contents === false) {
             throw new \obray\exceptions\SqlFileFailedToLoad();
         }
@@ -264,6 +264,8 @@ class oDBOStatement
             $queryString = trim($queryString);
             return $queryString;
         }, $queries);
+        // remove empty queries
+        $this->queryStrings = array_filter($this->queryStrings);        
     }
 
     /**
