@@ -174,6 +174,10 @@ class oDBOStatement
     {
         foreach ($this->pdoStatements as $index => $pdoStatement) {
             $resultCount = $pdoStatement->rowCount();
+            if ($this->results[$index] != true) {
+                continue;
+            }
+            $this->results[$index] = [];
             if ($resultCount > 0) {
                 $this->results[$index] = $pdoStatement->fetchAll($fetchStyle);
             }
