@@ -3,7 +3,7 @@
 namespace obray\data\exceptions;
 
 
-class SqlArrayFailedToLoad extends \Exception
+class SqlFailedToLoad extends \Exception
 {
 
 }

@@ -1,93 +1,51 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: cameronbird
- * Date: 5/7/18
- * Time: 2:31 PM
- */
+namespace obray\data;
 
-namespace obray;
+use obray\data\exceptions\SqlArrayFailedToLoad;
+use obray\data\DBConn;
+use obray\data\exceptions\SqlFailedToLoad;
+use obray\data\exceptions\SqlFileFailedToLoad;
+use obray\data\exceptions\SqlFileNotFound;
+use obray\data\exceptions\SqlStringFailedToLoad;
 
-
-/**
- * Class oDBOStatement
- * @package obray
- */
-
-use obray\exceptions\SqlArrayFailedToLoad;
-
-/**
- * Class oDBOStatement
- * @package obray
- */
-class oDBOStatement
+class DBStatement
 {
     const VALID_SORT_DIRECTIONS = ['ASC', 'DESC'];
 
-    /**
-     * @var oDBOConnection
-     */
-    protected $oDBOConnection;
-
-    /**
-     * @var string[]
-     */
+    protected $DBConn;
     protected $queryStrings;
-    /**
-     * @var oDBOParam[]
-     */
     protected $queryParams = [];
-    /**
-     * @var \PDOStatement[]
-     */
     protected $pdoStatements = [];
-    /**
-     * @var mixed[]
-     */
     protected $results = [];
 
-    /**
-     * oDBOStatement constructor.
-     * @param oDBOConnection $oDBOConnection
-     */
-    public function __construct(\obray\oDBOConnection $oDBOConnection)
+    public function __construct(DBConn $DBConn)
     {
-        $this->oDBOConnection = $oDBOConnection;
+        $this->DBConn = $DBConn;
     }
 
-    /**
-     * @param $sql
-     * @return $this
-     * @throws SqlFailedToLoad
-     */
     public function loadSql($sql)
     {
         try {
             $this->loadSqlFile($sql);
             return $this;
-        } catch (\obray\exceptions\SqlFileNotFound $e) {
+        } catch (SqlFileNotFound $e) {
         }
 
         try {
             $this->loadSqlArray($sql);
             return $this;
-        } catch (\obray\exceptions\SqlArrayFailedToLoad $e) {
+        } catch (SqlArrayFailedToLoad $e) {
         }
 
         try {
             $this->loadSqlString($sql);
             return $this;
-        } catch (\obray\exceptions\SqlStringFailedToLoad $e) {
+        } catch (SqlStringFailedToLoad $e) {
         }
 
-        throw new \obray\exceptions\SqlFailedToLoad();
+        throw new SqlFailedToLoad();
     }
 
-    /**
-     * @param oDBOParam[] $params
-     * @return $this
-     * @throws \Exception
-     */
     public function bindValues($params)
     {
         foreach ($params as $key => $param) {
@@ -95,41 +53,23 @@ class oDBOStatement
         }
     }
 
-    /**
-     * @param $name
-     * @param $param
-     * @param int $paramType
-     * @return $this
-     * @throws \Exception
-     */
     public function bindParam($name, &$param, $paramType = \PDO::PARAM_STR)
     {
-        $oDBOParam = new oDBOParam($name, $param, $paramType);
-        $this->addParam($name, $oDBOParam);
+        $DBParam = new DBParam($name, $param, $paramType);
+        $this->addParam($name, $DBParam);
         return $this;
     }
 
-    /**
-     * @param $name
-     * @param $param
-     * @param int $paramType (Default \PDO::PARAM_STR)
-     * @return $this
-     * @throws \Exception
-     */
     public function bindValue($name, $param, $paramType = \PDO::PARAM_STR)
     {
-        $oDBOParam = new oDBOParam($name, $param, $paramType);
-        $this->addParam($name, $oDBOParam);
+        $DBParam = new DBParam($name, $param, $paramType);
+        $this->addParam($name, $DBParam);
         return $this;
     }
 
-    /**
-     * prepare
-     *  Prepares queries to be run and bind params to first query
-     */
     private function prepare()
     {
-        $pdoConnection = $this->oDBOConnection->getConnection();
+        $pdoConnection = $this->DBConn->getConnection();
         $this->pdoStatements = [];
         foreach ($this->queryStrings as $index => $queryString) {
             $this->pdoStatements[$index] = $pdoConnection->prepare($queryString);
@@ -147,10 +87,6 @@ class oDBOStatement
         }
     }
 
-    /**
-     * execute
-     *  Executes the prepared queries
-     */
     public function execute()
     {
         $this->prepare();
@@ -164,12 +100,6 @@ class oDBOStatement
         return $this->results;
     }
 
-    /**
-     * FetchResults
-     *  Gets the results of each executed query and returns them in an array indexed by query number
-     * @param int $fetch_style PDO Fetch Style (defaults to FETCH_OBJ)
-     *
-     */
     public function fetchResults($fetchStyle = \PDO::FETCH_OBJ)
     {
         foreach ($this->pdoStatements as $index => $pdoStatement) {
@@ -185,17 +115,12 @@ class oDBOStatement
         return $this->results;
     }
 
-    /**
-     * @param $sqlString
-     * @return void
-     * @throws SqlStringFailedToLoad
-     */
     protected function loadSqlString($sqlString)
     {
         // Attempt to load SQL from string
         try {
             // Check if string is prepare-able
-            $dbh = $this->oDBOConnection->getConnection();
+            $dbh = $this->DBConn->getConnection();
             $pdoStatement = $dbh->prepare($sqlString);
             if ($pdoStatement !== false) {
                 $this->parseQueries($sqlString);
@@ -203,14 +128,9 @@ class oDBOStatement
             }
         } catch (\PDOException $e) {
         }
-        throw new \obray\exceptions\SqlStringFailedToLoad();
+        throw new SqlStringFailedToLoad();
     }
 
-    /**
-     * @param $sqlArray
-     * @return void
-     * @throws SqlArrayFailedToLoad
-     */
     protected function loadSqlArray($sqlArray)
     {
         // Attempt to load SQL from array
@@ -221,41 +141,21 @@ class oDBOStatement
             }
         } catch (\Exception $e) {
         }
-        throw new \obray\exceptions\SqlArrayFailedToLoad();
+        throw new SqlArrayFailedToLoad();
     }
 
-    /**
-     * Load SQL
-     *  Loads an SQL File from the data layer directory (/data/your/filepath/here.sql)
-     *
-     * @param string $file absolute sql file path
-     *
-     * @throws SqlFileNotFoundException
-     * @throws SqlFileFailedToLoadException
-     *
-     * @return void
-     **/
     protected function loadSqlFile($file)
     {
         $file = preg_replace('#/+#', '/', $file);
 
-        /*
-        -- TODO --
-        // check if file is cached, if so, load from cache
-        if( $this->isSqlCached($file) ) {
-            $sql = $this->loadSqlFromCache($file);
-        }
-        -- TODO --
-        */
-
         if (($path = realpath($file)) === false) {
-            throw new \obray\exceptions\SqlFileNotFound();
+            throw new SqlFileNotFound();
         }
 
         $contents = file_get_contents($path);
         
         if ($contents === false) {
-            throw new \obray\exceptions\SqlFileFailedToLoad();
+            throw new SqlFileFailedToLoad();
         }
 
         $this->parseQueries($contents);
@@ -272,11 +172,6 @@ class oDBOStatement
         $this->queryStrings = array_filter($this->queryStrings);        
     }
 
-    /**
-     * @param $key
-     * @param $value
-     * @throws \Exception
-     */
     protected function addParam($key, $value)
     {
         $key = trim($key, ';\t\n\r\x0B');

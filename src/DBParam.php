@@ -1,19 +1,7 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: cameronbird
- * Date: 5/7/18
- * Time: 3:08 PM
- */
+namespace obray\data;
 
-namespace obray;
-
-
-/**
- * Class oDBOParam
- * @package obray
- */
-class oDBOParam
+class DBParam
 {
     /**
      * @var Parameter name to be replaced in the prepared SQL

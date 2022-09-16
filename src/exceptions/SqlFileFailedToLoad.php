@@ -1,6 +1,6 @@
 <?php
 
-namespace obray\exceptions;
+namespace obray\data\exceptions;
 
 class SqlFileFailedToLoad extends \Exception
 {

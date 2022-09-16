@@ -4,9 +4,12 @@
  * @license http://www.opensource.org/licenses/mit-license.php MIT (see the LICENSE file)
  */
 
-namespace obray;
+namespace obray\data;
 
-Class oDBOConnection
+use obray\data\DBStatement;
+use obray\oCoreProjectEnum;
+
+Class DBConn
 {
 
     private $username;
@@ -99,6 +102,7 @@ Class oDBOConnection
                     ));
                 $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
                 $this->is_connected = true;
+                
             } catch (\PDOException $e) {
                 echo 'ERROR: ' . $e->getMessage();
                 exit();
@@ -118,23 +122,16 @@ Class oDBOConnection
         return $this->conn;
     }
 
-    /**
-     * @return bool
-     */
     public function isConnected()
     {
         return $this->is_connected;
     }
 
-    /**
-     * @param $sql
-     * @return oDBOStatement
-     */
     public function beginStatement($sql)
     {
-        $oDBOStatement = new oDBOStatement($this);
-        $oDBOStatement->loadSql($sql);
-        return $oDBOStatement;
+        $DBStatement = new DBStatement($this);
+        $DBStatement->loadSql($sql);
+        return $DBStatement;
     }
 
     public function __call($name, $arguments = array())
@@ -147,10 +144,10 @@ Class oDBOConnection
 
     public function run($sql, $bind = [], $fetchStyle = \PDO::FETCH_OBJ)
     {
-        $oDBOStatement = $this->beginStatement($sql);
-        $oDBOStatement->bindValues($bind);
-        $oDBOStatement->execute();
-        return $oDBOStatement->fetchResults($fetchStyle);
+        $DBStatement = $this->beginStatement($sql);
+        $DBStatement->bindValues($bind);
+        $DBStatement->execute();
+        return $DBStatement->fetchResults($fetchStyle);
     }
 
     public function runStoredProc($proc, $params = array())
@@ -178,7 +175,7 @@ Class oDBOConnection
             $statement->execute();
             $statement->setFetchMode(\PDO::FETCH_OBJ);
             $this->data = $statement->fetchAll();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             if (isset($this->is_transaction) && $this->is_transaction) {
                 $this->rollbackTransaction();
             }
