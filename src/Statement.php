@@ -9,7 +9,7 @@ use obray\data\sql\OrderBy;
 use obray\data\sql\Select;
 use obray\data\sql\Update;
 use obray\data\sql\Where;
-use obray\Obj;
+use obray\core\Obj;
 
 class Statement extends Obj
 {

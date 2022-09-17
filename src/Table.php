@@ -1,7 +1,9 @@
 <?php
 namespace obray\data;
 
-use obray\Obj;
+use obray\core\Obj;
+use obray\data\sql\ForeignKey;
+use obray\data\sql\Index;
 
 class Table extends Obj
 {

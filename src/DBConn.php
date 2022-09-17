@@ -7,7 +7,7 @@
 namespace obray\data;
 
 use obray\data\DBStatement;
-use obray\oCoreProjectEnum;
+use obray\core\CoreProjectEnum;
 
 Class DBConn
 {
@@ -180,7 +180,7 @@ Class DBConn
                 $this->rollbackTransaction();
             }
             $this->throwError($e);
-            $this->logError(oCoreProjectEnum::ODBO, $e);
+            $this->logError(CoreProjectEnum::DBO, $e);
         }
         return $this->data;
     }

@@ -1,5 +1,5 @@
 <?php
-namespace obray\data;
+namespace obray\data\sql;
 
 class ForeignKey
 {

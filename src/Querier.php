@@ -2,7 +2,7 @@
 namespace obray\data;
 
 use obray\data\Statement;
-use obray\Obj;
+use obray\core\Obj;
 
 class Querier extends Obj
 {
