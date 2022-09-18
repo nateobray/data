@@ -5,7 +5,7 @@
     "homepage": "http://www.obray.net",
     "require": {
         "php": ">=5.6",
-        "obray/core": "dev-master"
+        "obray/core": "dev-main"
     },
     "autoload": {
         "psr-4": {
