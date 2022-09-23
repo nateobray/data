@@ -4,7 +4,7 @@ namespace obray\data;
 use obray\data\Statement;
 use obray\core\Obj;
 
-class Querier extends Obj
+class Querier
 {
     private string $class;
     private string $sql;

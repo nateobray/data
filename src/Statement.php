@@ -1,6 +1,7 @@
 <?php
 namespace obray\data;
 
+use obray\core\Helpers;
 use obray\data\sql\Delete;
 use obray\data\sql\From;
 use obray\data\sql\Insert;
@@ -11,7 +12,7 @@ use obray\data\sql\Update;
 use obray\data\sql\Where;
 use obray\core\Obj;
 
-class Statement extends Obj
+class Statement
 {
     private string $class;
     private string $action = 'selecting';
@@ -89,7 +90,7 @@ class Statement extends Obj
 
     public function out()
     {
-        $this->console("%s", "\n\t**** SQL STATEMENT ****\n\n", "YellowBold");
+        Helpers::console("%s", "\n\t**** SQL STATEMENT ****\n\n", "YellowBold");
         $sql = '';
         if(!empty($this->insert)) $sql .= $this->insert->toSQL();
         if(!empty($this->update)) $sql .= $this->update->toSQL();
@@ -99,7 +100,7 @@ class Statement extends Obj
         if(!empty($this->where)) $sql .= $this->where->toSQL();
         if(!empty($this->orderBy)) $sql .= $this->orderBy->toSQL();
         if(!empty($this->limit)) $sql .= $this->limit->toSQL();
-        $this->console($sql."\n");
+        Helpers::console($sql."\n");
         return $this;
     }
 

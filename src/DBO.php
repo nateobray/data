@@ -1,9 +1,13 @@
 <?php
 namespace obray\data;
 
-class DBO 
+use JsonSerializable;
+use obray\data\types\BaseType;
+use obray\data\types\Password;
+use ReflectionProperty;
+
+class DBO implements JsonSerializable
 {
-    private $primaryKeyColumn;
     private $primaryKeyValue;
 
     public function __construct(...$params)
@@ -67,6 +71,9 @@ class DBO
         if(isSet($this->{'col_' . $key})){
             return $this->{'col_' . $key}->getValue();
         } 
+        if(isSet($this->{'cust_' . $key})){
+            return $this->{'cust_' . $key};
+        }
         return $this->{$key};
     }
 
@@ -99,6 +106,25 @@ class DBO
     public function onAfterUpdate(Querier $querier)
     {
         return;
+    }
+
+    public function jsonSerialize(): mixed
+    {
+        $obj = new \stdClass();
+        $reflection = new \ReflectionClass($this);
+        $properties = $reflection->getProperties();
+        
+        forEach($this as $key => $prop){
+            if(strpos($key, 'col_') !== false && $prop instanceof BaseType) {
+                if($prop instanceof Password) continue;
+                $obj->{str_replace('col_', '', $key)} = $prop->getValue();
+            }
+
+            if(strpos($key, 'cust_') !== false) {
+                $obj->{str_replace('cust_', '', $key)} = $this->{$key};
+            }
+        }
+        return $obj;
     }
 
 }
