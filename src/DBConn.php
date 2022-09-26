@@ -12,13 +12,13 @@ use obray\core\CoreProjectEnum;
 Class DBConn
 {
 
-    private $username;
-    private $password;
-    private $host;
-    private $port;
-    private $db_name;
-    private $db_engine;
-    private $db_char_set;
+    private string $username;
+    private string $password;
+    private string $host;
+    private string $port;
+    private string $db_name;
+    private string $db_engine;
+    private string $db_char_set;
 
     /**
      * @var \PDO The PDO Connection

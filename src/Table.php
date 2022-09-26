@@ -1,11 +1,10 @@
 <?php
 namespace obray\data;
 
-use obray\core\Obj;
 use obray\data\sql\ForeignKey;
 use obray\data\sql\Index;
 
-class Table extends Obj
+class Table
 {
     private DBConn $DBConn;
     public function __construct(DBConn $DBConn)
