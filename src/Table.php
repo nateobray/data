@@ -1,6 +1,7 @@
 <?php
 namespace obray\data;
 
+use obray\core\Helpers;
 use obray\data\sql\ForeignKey;
 use obray\data\sql\Index;
 
@@ -68,7 +69,7 @@ class Table
 
         $sql = $this->disableConstraints() . "\nCREATE TABLE `" . $table . '`' . "(\n";
 
-        $this->console("%s","*** Scripting Table " . $table . " ***\n","GreenBold");
+        Helpers::console("%s","*** Scripting Table " . $table . " ***\n","GreenBold");
         
         $columnSQL = [];
         $columns = self::getColumns($class);
@@ -110,7 +111,7 @@ class Table
 
         $sql .= $this->enableConstraints();
 
-        $this->console("%s","\n" . $sql . "\n","White");
+        Helpers::console("%s","\n" . $sql . "\n","White");
 
         $this->DBConn->query($sql);
 
