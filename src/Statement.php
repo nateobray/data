@@ -62,6 +62,13 @@ class Statement
         return $this;
     }
 
+    public function leftJoin(string $name, string $toClass, mixed $fromClass=null, string $toColumn=null, string $fromColumn=null)
+    {
+        $this->from->leftJoin($name, $toClass, $fromClass, $toColumn, $fromColumn);
+        if(!empty($this->select)) $this->select->add($name, $toClass);
+        return $this;
+    }
+
     public function join(string $name, string $toClass, mixed $fromClass=null, string $toColumn=null, string $fromColumn=null)
     {
         $this->from->join($name, $toClass, $fromClass, $toColumn, $fromColumn);
@@ -154,7 +161,7 @@ class Statement
                     $results[$result->getPrimaryKeyValue()]->{$join->getName()} = array();
                 }
                 // if an object with the joins primary key does not exist, then added it to the join
-                if(empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
+                if(!empty($joinResult) && empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
                     $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = $joinResult;
                 }
             }
@@ -187,6 +194,10 @@ class Statement
             }
         }
         $joinResult = new ($join->getToClass())(...$objProps);
+        if($joinResult->empty()){
+            $joinResult = null;
+            return $joinResult;
+        } 
         forEach($join->joins as $j){
             $result = $this->populateJoin($row, $j);
             if(empty($joinResult->{$j->getName()})) $joinResult->{$j->getName()} = [];

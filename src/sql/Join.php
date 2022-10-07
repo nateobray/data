@@ -10,14 +10,18 @@ class Join
     private $toClass;
     private $toColumn;
     public $joins = [];
+
+    const INNER = 1;
+    const LEFT = 2;
     
-    public function __construct($name, $fromClass, $fromColumn, $toClass, $toColumn)
+    public function __construct($name, $fromClass, $fromColumn, $toClass, $toColumn, $type = self::LEFT)
     {
         $this->name = $name;
         $this->fromClass = $fromClass;
         $this->fromColumn = $fromColumn;
         $this->toClass = $toClass;
         $this->toColumn = $toColumn;
+        $this->type = $type;
     }
 
     public function getName()
@@ -58,7 +62,11 @@ class Join
     public function toSQL()
     {
         $fromTable = (empty($this->fromAlias)?$this->getFromTable():$this->fromAlias);
-        $sql = '   JOIN `' . $this->getToTable() . '` `'.$this->name.'` ON `'. $this->name . '`.`' . $this->getToColumn() . '` = `' . $fromTable . '`.`' . $this->getFromColumn() . "`\n";
+        $type = 'JOIN';
+        if($this->type === self::LEFT){
+            $type = 'LEFT JOIN';
+        }
+        $sql = '   ' . $type . ' `' . $this->getToTable() . '` `'.$this->name.'` ON `'. $this->name . '`.`' . $this->getToColumn() . '` = `' . $fromTable . '`.`' . $this->getFromColumn() . "`\n";
         forEach($this->joins as $join){
             $sql .= $join->toSQL();
         }
