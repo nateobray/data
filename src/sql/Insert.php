@@ -9,6 +9,7 @@ class Insert
 {
     private $instance;
     private DBConn $DBConn;
+    private $values = [];
 
     public function __construct(mixed $instance, DBConn $DBConn)
     {
@@ -41,7 +42,7 @@ class Insert
             $columnSQL[] = $column->propertyName;
         }
 
-        $instanceSQL = [];
+        $instanceSQL = []; 
         forEach($this->instance as $instance){
             $this->instance = $instance;
             $valueSQL = [];
@@ -49,10 +50,16 @@ class Insert
                 if(strpos($column->propertyClass, 'PrimaryKey') && empty($this->instance->{$column->propertyName})) continue;
                 if(strpos($column->propertyClass, 'DateTimeCreated')) continue;
                 if(strpos($column->propertyClass, 'DateTimeModified')) continue;
-                $valueSQL[] = $instance->{$column->name}->insertSQL($this->DBConn);
+                $valueSQL[] = ':' . $column->name; 
+                $this->values[$column->name] = $instance->{$column->name}->getValue();
             }
             $instanceSQL[] = '('.implode(',', $valueSQL).')';
         }
         return "INSERT INTO " . $table . ' (' .implode(',', $columnSQL). ")\n     VALUES\n\t" . implode(",\n\t", $instanceSQL);
+    }
+
+    public function values()
+    {
+        return $this->values;
     }
 }

@@ -1,6 +1,8 @@
 <?php
 namespace obray\data\sql;
 
+use obray\core\Helpers;
+
 class From
 {
     private string $table;
@@ -49,13 +51,16 @@ class From
         } elseif(!empty($this->joinMap[$fromClass.$aliasAttachement])) {
             $this->joinMap[$fromClass.$aliasAttachement]->joins[$toClass.'-'.$name] = new Join($name, $fromClass, $fromColumn, $toClass, $toColumn, $joinType);
             if(!empty($alias)) $this->joinMap[$fromClass.$aliasAttachement]->joins[$toClass.'-'.$name]->addFromAlias($alias);
-            //$this->joinMap[$toClass.'-'.$name] = &$this->joinMap[$fromClass.$aliasAttachement]->joins[$toClass.'-'.$name];
+            if(empty($this->joinMap[$toClass.'-'.$name])){
+                $this->joinMap[$toClass.'-'.$name] = &$this->joinMap[$fromClass.$aliasAttachement]->joins[$toClass.'-'.$name];
+            }
         } elseif (empty($this->joinMap[$fromClass.$aliasAttachement])) {
             $this->joins[$fromClass.$aliasAttachement] = new Join($name, $fromClass, $fromColumn, $toClass, $toColumn, $joinType);
             if(!empty($alias)) $this->joins[$fromClass.$aliasAttachement]->addFromAlias($alias);
-            //$this->joinMap[$toClass.'-'.$name] = &$this->joins[$fromClass.$aliasAttachement];
+            if(empty($this->joinMap[$fromClass.$aliasAttachement])){
+                $this->joinMap[$toClass.'-'.$name] = &$this->joins[$fromClass.$aliasAttachement];
+            }
         }
-
     }
 
     public function toSQL()

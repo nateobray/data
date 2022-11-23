@@ -28,8 +28,27 @@ class Where
                 forEach($value as $index => $v){
                     $columnKey = $column . '_' . $index;
                     if(strpos($column, '.') !== false) $columnKey = str_replace('.', '', strstr($column, '.')) . '_' . $index;
-                    $ors[] = $column . ' = :' . $columnKey;
-                    $this->values[':' . $columnKey] = $v;
+                    if($v instanceof Not){
+                        if($v->getValue() === null){
+                            $ors[] = $column . ' != :' . $columnKey;
+                        } else {
+                            $ors[] = $column . ' IS NOT :' . $columnKey;
+                        }
+                        $this->values[':' . $columnKey] = $v->getValue();
+                    } else if ($v instanceof GT){
+                        $ors[] = $column . ' > :' . $columnKey;
+                        $this->values[':' . $columnKey] = $v->getValue();
+                    } else {
+                        if($v === null){
+                            $ors[] = $column . ' IS NULL';
+                        } else {
+                            $ors[] = $column . ' = :' . $columnKey;
+                            $this->values[':' . $columnKey] = $v;
+                        }
+                        
+                    }
+                    
+                    
                 }
                 $columnSQL[] = '( ' . implode(' OR ', $ors) . ' )';
                 continue;
@@ -38,14 +57,25 @@ class Where
             $columnKey = $column;
             if(strpos($column, '.') !== false) $columnKey = str_replace('.', '', strstr($column, '.'));
 
-            $columnSQL[] = $column . ' = :' . $columnKey;
-            $this->values[':' . $columnKey] = $value; 
+            if($value instanceof Not){
+                if($value->getValue() === null){
+                    $columnSQL[] = $column . ' IS NOT NULL';
+                } else {
+                    $columnSQL[] = $column . ' != :' . $columnKey;
+                    $this->values[':' . $columnKey] = $value->getValue();
+                }
+            } else if ($value instanceof GT){
+                $columnSQL[] = $column . ' > :' . $columnKey;
+                    $this->values[':' . $columnKey] = $value->getValue();
+            } else {
+                $columnSQL[] = $column . ' = :' . $columnKey;
+                $this->values[':' . $columnKey] = $value; 
+            }
+
         }
         $sql = '  WHERE ' . implode("\n    AND ", $columnSQL) . "\n";
         return $sql;
     }
-
-
 
     public function values(): array
     {

@@ -114,14 +114,20 @@ class Statement
     public function run($sql='')
     {
         $values = [];
-        if(!empty($this->insert)) $sql .= $this->insert->toSQL();
-        if(!empty($this->update)) $sql .= $this->update->toSQL();
+        if(!empty($this->insert)){
+            $sql .= $this->insert->toSQL();
+            $values = $this->insert->values();
+        } 
+        if(!empty($this->update)){
+            $sql .= $this->update->toSQL();
+            $values = $this->update->values();
+        } 
         if(!empty($this->delete)) $sql .= $this->delete->toSQL();
         if(!empty($this->select)) $sql .= $this->select->toSQL();
         if(!empty($this->from)) $sql .= $this->from->toSQL();
         if(!empty($this->where)){
             $sql .= $this->where->toSQL();
-            $values = $this->where->values();
+            $values = array_merge($values, $this->where->values());
         }
         if(!empty($this->orderBy)) $sql .= $this->orderBy->toSQL();
         if(!empty($this->limit)) $sql .= $this->limit->toSQL();
@@ -137,6 +143,7 @@ class Statement
         $data = $this->conn->run($sql, $values, \PDO::FETCH_ASSOC);
 
         $results = [];
+
         foreach ($data[0] as $i => $row) {
             if(empty($row)) continue;
 
@@ -162,10 +169,12 @@ class Statement
                 }
                 // if an object with the joins primary key does not exist, then added it to the join
                 if(!empty($joinResult) && empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
+                    
                     $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = $joinResult;
                 }
             }
         }
+        
         $this->sql = '';
         if($this->returnSingleRow){
             $results = array_values($results);
@@ -182,6 +191,7 @@ class Statement
             $this->insert->onAfterInsert($this->newQuerier(), $lastId);
             return $lastId;
         }
+        if(is_array($results)) array_values($results);
         return $results;
     }
 
@@ -205,6 +215,7 @@ class Statement
                 $joinResult->{$j->getName()}[$result->getPrimaryKeyValue()] = $result;
             }
         }
+
         return $joinResult;
     }
 

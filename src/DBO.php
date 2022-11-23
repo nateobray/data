@@ -74,7 +74,8 @@ class DBO implements JsonSerializable
         if(isSet($this->{'cust_' . $key})){
             return $this->{'cust_' . $key};
         }
-        return $this->{$key};
+        $value = $this->{$key};
+        return $value;
     }
 
     public function __isSet($key)

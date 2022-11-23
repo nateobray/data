@@ -9,6 +9,7 @@ class Update
 {
     private $instance;
     private DBConn $DBConn;
+    private $values = [];
 
     public function __construct(mixed $instance, DBConn $DBConn)
     {
@@ -40,7 +41,8 @@ class Update
             }
             if(strpos($column->propertyClass, 'DateTimeCreated')) continue;
             if(strpos($column->propertyClass, 'DateTimeModified')) continue;
-            $columnSQL[] = "`" . $column->propertyName . "` = " . $this->instance->{$column->name}->insertSQL($this->DBConn);
+            $columnSQL[] = "`" . $column->propertyName . "` = :" . $column->name;
+            $this->values[$column->name] = $this->instance->{$column->name}->getValue();
         }
 
         $sql = "UPDATE ";
@@ -51,5 +53,10 @@ class Update
             $sql .= "\n WHERE " . implode("\n  AND ", $whereSQL);
         }
         return $sql;
+    }
+
+    public function values()
+    {
+        return $this->values;
     }
 }
