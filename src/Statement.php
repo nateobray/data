@@ -145,6 +145,7 @@ class Statement
         $results = [];
 
         foreach ($data[0] as $i => $row) {
+
             if(empty($row)) continue;
 
             $objProps = [];
@@ -169,12 +170,17 @@ class Statement
                 }
                 // if an object with the joins primary key does not exist, then added it to the join
                 if(!empty($joinResult) && empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
-                    
                     $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = $joinResult;
+                } else if (!empty($joinResult) && !empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
+                    $originalObject = (array)$results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()];
+                    $resultsObj = (array)$joinResult;
+                    $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = (object)array_replace_recursive($originalObject, $resultsObj);
                 }
             }
         }
-        
+
+        $this->removePrimaryKeys($results);
+
         $this->sql = '';
         if($this->returnSingleRow){
             $results = array_values($results);
@@ -215,8 +221,15 @@ class Statement
                 $joinResult->{$j->getName()}[$result->getPrimaryKeyValue()] = $result;
             }
         }
-
         return $joinResult;
+    }
+
+    private function removePrimaryKeys(mixed &$results)
+    {
+        if(is_array($results)) $results = array_values($results);
+        forEach($results as $key => &$value){
+            if(is_array($value) || is_object($value)) $this->removePrimaryKeys($value);
+        }
     }
 
     private function newQuerier()
