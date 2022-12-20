@@ -113,6 +113,15 @@ class Statement
 
     public function run($sql='')
     {
+
+        if($this->action === 'updating'){
+            $this->update->onBeforeUpdate($this->newQuerier());
+        }
+
+        if($this->action === 'inserting'){
+            $this->insert->onBeforeInsert($this->newQuerier());
+        }
+
         $values = [];
         if(!empty($this->insert)){
             $sql .= $this->insert->toSQL();
@@ -132,14 +141,6 @@ class Statement
         if(!empty($this->orderBy)) $sql .= $this->orderBy->toSQL();
         if(!empty($this->limit)) $sql .= $this->limit->toSQL();
         
-        if($this->action === 'updating'){
-            $this->update->onBeforeUpdate($this->newQuerier());
-        }
-
-        if($this->action === 'inserting'){
-            $this->insert->onBeforeInsert($this->newQuerier());
-        }
-
         $data = $this->conn->run($sql, $values, \PDO::FETCH_ASSOC);
 
         $results = [];
