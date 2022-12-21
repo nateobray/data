@@ -3,7 +3,7 @@ namespace obray\data\types;
 
 use obray\data\DBConn;
 
-class DateTimeNullable extends BaseType
+class DateTimeNullable extends DateTime
 {
     const IS_PRIMARY = false;
     const TYPE = 'DATETIME';

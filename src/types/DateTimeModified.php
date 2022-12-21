@@ -1,7 +1,7 @@
 <?php
 namespace obray\data\types;
 
-class DateTimeModified extends BaseType
+class DateTimeModified extends DateTime
 {
     const TYPE = 'DATETIME';
     const LENGTH = null;
