@@ -38,6 +38,15 @@ class Where
                     } else if ($v instanceof GT){
                         $ors[] = $column . ' > :' . $columnKey;
                         $this->values[':' . $columnKey] = $v->getValue();
+                    } else if ($v instanceof GTE){
+                        $ors[] = $column . ' >= :' . $columnKey;
+                        $this->values[':' . $columnKey] = $v->getValue();
+                    } else if ($v instanceof LT){
+                        $ors[] = $column . ' < :' . $columnKey;
+                        $this->values[':' . $columnKey] = $v->getValue();
+                    } else if ($v instanceof LTE){
+                        $ors[] = $column . ' <= :' . $columnKey;
+                        $this->values[':' . $columnKey] = $v->getValue();
                     } else {
                         if($v === null){
                             $ors[] = $column . ' IS NULL';
@@ -66,7 +75,16 @@ class Where
                 }
             } else if ($value instanceof GT){
                 $columnSQL[] = $column . ' > :' . $columnKey;
-                    $this->values[':' . $columnKey] = $value->getValue();
+                $this->values[':' . $columnKey] = $value->getValue();
+            } else if ($value instanceof GTE){
+                $columnSQL[] = $column . ' >= :' . $columnKey;
+                $this->values[':' . $columnKey] = $value->getValue();
+            } else if ($value instanceof LT){
+                $columnSQL[] = $column . ' < :' . $columnKey;
+                $this->values[':' . $columnKey] = $value->getValue();
+            } else if ($value instanceof LTE){
+                $columnSQL[] = $column . ' <= :' . $columnKey;
+                $this->values[':' . $columnKey] = $value->getValue();
             } else {
                 $columnSQL[] = $column . ' = :' . $columnKey;
                 $this->values[':' . $columnKey] = $value; 
