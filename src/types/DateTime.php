@@ -36,7 +36,7 @@ class DateTime extends BaseType implements \JsonSerializable
 
     public function getValue()
     {
-        if($this->value === null) return '';
+        if($this->value === null) return null;
         return $this->value->format('c');
     }
 

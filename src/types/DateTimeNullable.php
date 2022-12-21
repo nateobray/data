@@ -16,6 +16,6 @@ class DateTimeNullable extends DateTime
     public function insertSQL(?DBConn $conn=null)
     {
         if($this->value === null) return 'null';
-        return $conn->quote($this->value, \PDO::PARAM_STR);
+        return $conn->quote($this->value->format('Y-m-d H:i:s'), \PDO::PARAM_STR);
     }
 }
