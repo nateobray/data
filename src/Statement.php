@@ -173,9 +173,9 @@ class Statement
                 if(!empty($joinResult) && empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
                     $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = $joinResult;
                 } else if (!empty($joinResult) && !empty($results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()])){
-                    $originalObject = (array)$results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()];
-                    $resultsObj = (array)$joinResult;
-                    $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = (object)array_replace_recursive($originalObject, $resultsObj);
+                    $originalObject = $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()];
+                    $resultsObj = $joinResult;
+                    $results[$result->getPrimaryKeyValue()]->{$join->getName()}[$joinResult->getPrimaryKeyValue()] = $this->merge($originalObject, $resultsObj);
                 }
             }
         }
@@ -200,6 +200,33 @@ class Statement
         }
         if(is_array($results)) array_values($results);
         return $results;
+    }
+
+    private function merge($obj1, $obj2)
+    {
+        $merged = clone $obj1;
+        forEach($obj2 as $key => $value){
+            if(is_array($value)){
+                $merged->{$key} = $this->mergeArray($merged->{$key}, $value);
+            } else if (is_object($value)){
+                $merged->{$key} = $this->merge($merged->{$key}, $value);
+            }
+        }
+        return $merged;
+    }
+
+    private function mergeArray($arr1, $arr2)
+    {
+        
+        $merged = $arr1;
+        forEach($arr2 as $key => $value){
+            if(array_key_exists($key, $merged)){
+                $merged[$key] = $this->merge($merged[$key], $value);    
+            } else {
+                $merged[$key] = $value;
+            }
+        }
+        return $merged;
     }
 
     private function populateJoin($row, $join)
