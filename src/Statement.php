@@ -217,7 +217,6 @@ class Statement
 
     private function mergeArray($arr1, $arr2)
     {
-        
         $merged = $arr1;
         forEach($arr2 as $key => $value){
             if(array_key_exists($key, $merged)){

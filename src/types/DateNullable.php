@@ -3,7 +3,7 @@ namespace obray\data\types;
 
 use obray\data\DBConn;
 
-class Date extends BaseType
+class DateNullable extends BaseType
 {
     const TYPE = 'DATE';
     const NULLABLE = true;
