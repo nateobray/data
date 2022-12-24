@@ -243,6 +243,7 @@ class Statement
         } 
         forEach($join->joins as $j){
             $result = $this->populateJoin($row, $j);
+            if(empty($result)) continue;
             if(empty($joinResult->{$j->getName()})) $joinResult->{$j->getName()} = [];
             if(empty($joinResult->{$j->getName()}[$result->getPrimaryKeyValue()])){
                 $joinResult->{$j->getName()}[$result->getPrimaryKeyValue()] = $result;
