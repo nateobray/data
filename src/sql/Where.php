@@ -26,8 +26,8 @@ class Where
             if(is_array($value)){
                 $ors = [];
                 forEach($value as $index => $v){
-                    $columnKey = $column . '_' . $index;
-                    if(strpos($column, '.') !== false) $columnKey = str_replace('.', '', strstr($column, '.')) . '_' . $index;
+                    $columnKey = $column . '_' . $index . '_';
+                    if(strpos($column, '.') !== false) $columnKey = str_replace('.', '', strstr($column, '.')) . '_' . $index . '_';
                     if($v instanceof Not){
                         if($v->getValue() === null){
                             $ors[] = $column . ' != :' . $columnKey;
