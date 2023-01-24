@@ -26,40 +26,18 @@ class Where
             if(is_array($value)){
                 $ors = [];
                 forEach($value as $index => $v){
-                    $columnKey = $column . '_' . $index . '_';
-                    if(strpos($column, '.') !== false) $columnKey = str_replace('.', '', strstr($column, '.')) . '_' . $index . '_';
-                    if($v instanceof Not){
-                        if($v->getValue() === null){
-                            $ors[] = $column . ' != :' . $columnKey;
-                        } else {
-                            $ors[] = $column . ' IS NOT :' . $columnKey;
-                        }
-                        $this->values[':' . $columnKey] = $v->getValue();
-                    } else if ($v instanceof GT){
-                        $ors[] = $column . ' > :' . $columnKey;
-                        $this->values[':' . $columnKey] = $v->getValue();
-                    } else if ($v instanceof GTE){
-                        $ors[] = $column . ' >= :' . $columnKey;
-                        $this->values[':' . $columnKey] = $v->getValue();
-                    } else if ($v instanceof LT){
-                        $ors[] = $column . ' < :' . $columnKey;
-                        $this->values[':' . $columnKey] = $v->getValue();
-                    } else if ($v instanceof LTE){
-                        $ors[] = $column . ' <= :' . $columnKey;
-                        $this->values[':' . $columnKey] = $v->getValue();
-                    } else {
-                        if($v === null){
-                            $ors[] = $column . ' IS NULL';
-                        } else {
-                            $ors[] = $column . ' = :' . $columnKey;
-                            $this->values[':' . $columnKey] = $v;
-                        }
-                        
-                    }
-                    
-                    
+                    $ors[] = $this->getExpression($column, $index, $v);
                 }
                 $columnSQL[] = '( ' . implode(' OR ', $ors) . ' )';
+                continue;
+            }
+
+            if($value instanceof AndOp){
+                $ands = [];
+                forEach($value->getValue() as $index => $v){
+                    $ands[] = $this->getExpression($column, $index, $v);
+                }
+                $columnSQL[] = '( ' . implode(' AND ', $ands) . ' )';
                 continue;
             }
 
@@ -93,6 +71,39 @@ class Where
         }
         $sql = '  WHERE ' . implode("\n    AND ", $columnSQL) . "\n";
         return $sql;
+    }
+
+    private function getExpression($column, $index, $v)
+    {
+        $columnKey = $column . '_' . $index . '_';
+        if(strpos($column, '.') !== false) $columnKey = str_replace('.', '', strstr($column, '.')) . '_' . $index . '_';
+        if($v instanceof Not){
+            $this->values[':' . $columnKey] = $v->getValue();
+            if($v->getValue() === null){
+                return $column . ' != :' . $columnKey;
+            } else {
+                return $column . ' IS NOT :' . $columnKey;
+            }
+        } else if ($v instanceof GT){
+            $this->values[':' . $columnKey] = $v->getValue();
+            return $column . ' > :' . $columnKey;
+        } else if ($v instanceof GTE){
+            $this->values[':' . $columnKey] = $v->getValue();
+            return $column . ' >= :' . $columnKey;
+        } else if ($v instanceof LT){
+            $this->values[':' . $columnKey] = $v->getValue();
+            return $column . ' < :' . $columnKey;
+        } else if ($v instanceof LTE){
+            $this->values[':' . $columnKey] = $v->getValue();
+            return $column . ' <= :' . $columnKey;
+        } else {
+            if($v === null){
+                return $column . ' IS NULL';
+            } else {
+                $this->values[':' . $columnKey] = $v;
+                return $column . ' = :' . $columnKey;
+            }
+        }
     }
 
     public function values(): array
